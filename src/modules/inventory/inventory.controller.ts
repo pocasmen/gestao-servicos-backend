@@ -189,5 +189,10 @@ export class InventoryController {
         await this.partsSaleService.deleteSale(+req.params.id, req.user!.id);
         res.status(204).send();
     });
+
+    convertSaleToSale = catchAsync(async (req: AuthenticatedRequest, res: Response) => {
+        const result = await this.partsSaleService.convertToSale(+req.params.id, req.user!.id);
+        res.json(result);
+    });
 }
 

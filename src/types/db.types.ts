@@ -1034,6 +1034,15 @@ export type Database = {
           updated_at: string | null
           created_by: string | null
           updated_by: string | null
+          client_name: string | null
+          client_address: string | null
+          client_nif: string | null
+          client_city: string | null
+          client_postcode: string | null
+          equipment_brand: string | null
+          equipment_model: string | null
+          equipment_serial_number: string | null
+          equipment_nickname: string | null
         }
         Insert: {
           id?: number
@@ -1055,6 +1064,15 @@ export type Database = {
           updated_at?: string | null
           created_by?: string | null
           updated_by?: string | null
+          client_name?: string | null
+          client_address?: string | null
+          client_nif?: string | null
+          client_city?: string | null
+          client_postcode?: string | null
+          equipment_brand?: string | null
+          equipment_model?: string | null
+          equipment_serial_number?: string | null
+          equipment_nickname?: string | null
         }
         Update: {
           id?: number
@@ -1076,6 +1094,15 @@ export type Database = {
           updated_at?: string | null
           created_by?: string | null
           updated_by?: string | null
+          client_name?: string | null
+          client_address?: string | null
+          client_nif?: string | null
+          client_city?: string | null
+          client_postcode?: string | null
+          equipment_brand?: string | null
+          equipment_model?: string | null
+          equipment_serial_number?: string | null
+          equipment_nickname?: string | null
         }
         Relationships: [
           {
@@ -1151,6 +1178,7 @@ export type Database = {
           quantity: number
           stock_type: string | null
           designation: string
+          reference: string | null
         }
         Insert: {
           reportId: number
@@ -1158,6 +1186,7 @@ export type Database = {
           quantity: number
           stock_type?: string | null
           designation?: string
+          reference?: string | null
         }
         Update: {
           reportId?: number
@@ -1165,6 +1194,7 @@ export type Database = {
           quantity?: number
           stock_type?: string | null
           designation?: string
+          reference?: string | null
         }
         Relationships: [
           {
@@ -1257,6 +1287,15 @@ export type Database = {
           billing_status: string | null
           time_blocks: Json | null
           client_signer_name: string | null
+          client_name: string | null
+          client_address: string | null
+          client_nif: string | null
+          client_city: string | null
+          client_postcode: string | null
+          equipment_brand: string | null
+          equipment_model: string | null
+          equipment_serial_number: string | null
+          equipment_nickname: string | null
           created_at: string | null
           updated_at: string | null
           updated_by: string | null
@@ -1283,6 +1322,15 @@ export type Database = {
           billing_status?: string | null
           time_blocks?: Json | null
           client_signer_name?: string | null
+          client_name?: string | null
+          client_address?: string | null
+          client_nif?: string | null
+          client_city?: string | null
+          client_postcode?: string | null
+          equipment_brand?: string | null
+          equipment_model?: string | null
+          equipment_serial_number?: string | null
+          equipment_nickname?: string | null
           created_at?: string | null
           updated_at?: string | null
           updated_by?: string | null
@@ -1309,6 +1357,15 @@ export type Database = {
           billing_status?: string | null
           time_blocks?: Json | null
           client_signer_name?: string | null
+          client_name?: string | null
+          client_address?: string | null
+          client_nif?: string | null
+          client_city?: string | null
+          client_postcode?: string | null
+          equipment_brand?: string | null
+          equipment_model?: string | null
+          equipment_serial_number?: string | null
+          equipment_nickname?: string | null
           created_at?: string | null
           updated_at?: string | null
           updated_by?: string | null

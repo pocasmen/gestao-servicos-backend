@@ -54,16 +54,22 @@ async function syncReportTechnicians(db: PoolClient, reportId: number, technicia
 
 async function syncReportPartsAndAbate(db: PoolClient, reportId: number, parts: any[], isUpdate: boolean = false, oldParts: any[] = [], userId: string = '') {
     // 1. Summarize NEW parts
-    const finalMap = new Map<string, { partId: number; quantity: number; stockType: StockType; designation: string; isApplied: boolean }>();
+    const finalMap = new Map<string, { partId: number; quantity: number; stockType: StockType; designation: string; reference: string; isApplied: boolean }>();
     if (Array.isArray(parts)) {
         for (const p of parts) {
             let pId = p.id;
-            if (!pId && p.reference) {
-                const cleanedRef = p.reference.trim();
-                const { rows } = await db.query('SELECT id, track_stock FROM parts WHERE reference = $1 OR TRIM(reference) = $1', [cleanedRef]);
+            let pRef = p.reference ? String(p.reference).trim() : '';
+            if (!pId && pRef) {
+                const { rows } = await db.query('SELECT id, track_stock, reference, designation FROM parts WHERE reference = $1 OR TRIM(reference) = $1', [pRef]);
                 if (rows.length > 0) {
                     pId = rows[0].id;
                     p.track_stock = rows[0].track_stock;
+                    if (!pRef) pRef = rows[0].reference;
+                }
+            } else if (pId && !pRef) {
+                const { rows } = await db.query('SELECT reference FROM parts WHERE id = $1', [pId]);
+                if (rows.length > 0) {
+                    pRef = rows[0].reference;
                 }
             }
             if (!pId) continue;
@@ -84,7 +90,7 @@ async function syncReportPartsAndAbate(db: PoolClient, reportId: number, parts: 
             if (existing) {
                 existing.quantity += qty;
             } else {
-                finalMap.set(key, { partId: pId, quantity: qty, stockType: st, designation, isApplied });
+                finalMap.set(key, { partId: pId, quantity: qty, stockType: st, designation, reference: pRef, isApplied });
             }
         }
     }
@@ -96,7 +102,8 @@ async function syncReportPartsAndAbate(db: PoolClient, reportId: number, parts: 
         oldMap.set(key, Number(op.quantity));
     }
 
-    // 3. Process Deltas
+    // 3. Process Deltas (PROVISÓRIO: Desativado para retificação manual de relatórios antigos)
+
     const allKeys = new Set([...oldMap.keys(), ...finalMap.keys()]);
     for (const key of allKeys) {
         const oldQty = oldMap.get(key) || 0;
@@ -116,12 +123,13 @@ async function syncReportPartsAndAbate(db: PoolClient, reportId: number, parts: 
         }
     }
 
+
     // 4. Update the relationship table
     await db.query('DELETE FROM report_parts WHERE "reportId" = $1', [reportId]);
     for (const part of finalMap.values()) {
         await db.query(
-            'INSERT INTO report_parts ("reportId", "partId", "quantity", "stock_type", "designation", "is_applied") VALUES ($1, $2, $3, $4, $5, $6)',
-            [reportId, part.partId, part.quantity, part.stockType, part.designation, part.isApplied]
+            'INSERT INTO report_parts ("reportId", "partId", "quantity", "stock_type", "designation", "reference", "is_applied") VALUES ($1, $2, $3, $4, $5, $6, $7)',
+            [reportId, part.partId, part.quantity, part.stockType, part.designation, part.reference || null, part.isApplied]
         );
     }
 }
@@ -176,14 +184,50 @@ export async function createFullReport(db: PoolClient, data: any, creatorId: str
 
     const newReportNumber = await generateReportNumber(db, serviceDate, scheduleId);
 
+    // Fetch client snapshot data
+    let clientName: string | null = data.client_name || null;
+    let clientAddress: string | null = data.client_address || null;
+    let clientNif: string | null = data.client_nif || null;
+    let clientCity: string | null = data.client_city || null;
+    let clientPostcode: string | null = data.client_postcode || null;
+    if (clientId && (!clientName || !clientAddress || !clientNif)) {
+        const { rows: clientRows } = await db.query('SELECT name, address, nif, city, "postCode" FROM clients WHERE id = $1', [clientId]);
+        if (clientRows.length > 0) {
+            const c = clientRows[0];
+            clientName = clientName || c.name || null;
+            clientAddress = clientAddress || c.address || null;
+            clientNif = clientNif || c.nif || null;
+            clientCity = clientCity || c.city || null;
+            clientPostcode = clientPostcode || c.postCode || null;
+        }
+    }
+
+    // Fetch equipment snapshot data
+    let equipmentBrand: string | null = data.equipment_brand || null;
+    let equipmentModel: string | null = data.equipment_model || null;
+    let equipmentSerialNumber: string | null = data.equipment_serial_number || null;
+    let equipmentNickname: string | null = data.equipment_nickname || null;
+    if (equipmentId && (!equipmentBrand || !equipmentModel || !equipmentSerialNumber)) {
+        const { rows: equipRows } = await db.query('SELECT brand, model, "serialNumber", nickname FROM equipments WHERE id = $1', [equipmentId]);
+        if (equipRows.length > 0) {
+            const e = equipRows[0];
+            equipmentBrand = equipmentBrand || e.brand || null;
+            equipmentModel = equipmentModel || e.model || null;
+            equipmentSerialNumber = equipmentSerialNumber || e.serialNumber || null;
+            equipmentNickname = equipmentNickname || e.nickname || null;
+        }
+    }
+
     const { rows } = await db.query<Report>(
         `INSERT INTO reports (
             "clientId", "equipmentId", "scheduleId", "serviceDate", "hours",
             "description", "damage", "serviceType", "internal_notes",
             "report_number", "signature", "technician_signature",
             "includes_travel", "classification", "created_by", "updated_by", "time_blocks",
-            "client_signer_name"
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING id`,
+            "client_signer_name",
+            "client_name", "client_address", "client_nif", "client_city", "client_postcode",
+            "equipment_brand", "equipment_model", "equipment_serial_number", "equipment_nickname"
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27) RETURNING id`,
         [
             clientId, equipmentId, scheduleId, serviceDate, hours,
             description, damage || '', JSON.stringify(Array.isArray(serviceType) ? serviceType : (serviceType ? [serviceType] : [])), internalNotes || '',
@@ -193,7 +237,9 @@ export async function createFullReport(db: PoolClient, data: any, creatorId: str
             creatorId,
             creatorId, // updated_by also creator initially
             timeBlocks ? JSON.stringify(timeBlocks) : null,
-            client_signer_name || null
+            client_signer_name || null,
+            clientName, clientAddress, clientNif, clientCity, clientPostcode,
+            equipmentBrand, equipmentModel, equipmentSerialNumber, equipmentNickname
         ]
     );
     const reportId = rows[0].id;
@@ -292,10 +338,45 @@ export async function updateFullReport(db: PoolClient, reportId: number, data: a
 
     // Fetch current report data BEFORE update to detect billing-affecting changes
     const { rows: currentReportRows } = await db.query<Report>(
-        'SELECT hours, includes_travel FROM reports WHERE id = $1',
+        'SELECT hours, includes_travel, "clientId", "equipmentId", client_name, equipment_brand FROM reports WHERE id = $1',
         [reportId]
     );
     const currentReport = currentReportRows[0];
+
+    // Check if client/equipment changed or if snapshot is missing
+    let clientName: string | null = data.client_name ?? (currentReport ? (currentReport as any).client_name : null);
+    let clientAddress: string | null = data.client_address ?? null;
+    let clientNif: string | null = data.client_nif ?? null;
+    let clientCity: string | null = data.client_city ?? null;
+    let clientPostcode: string | null = data.client_postcode ?? null;
+
+    if (clientId && (clientId !== currentReport?.clientId || !clientName)) {
+        const { rows: clientRows } = await db.query('SELECT name, address, nif, city, "postCode" FROM clients WHERE id = $1', [clientId]);
+        if (clientRows.length > 0) {
+            const c = clientRows[0];
+            clientName = c.name || null;
+            clientAddress = c.address || null;
+            clientNif = c.nif || null;
+            clientCity = c.city || null;
+            clientPostcode = c.postCode || null;
+        }
+    }
+
+    let equipmentBrand: string | null = data.equipment_brand ?? (currentReport ? (currentReport as any).equipment_brand : null);
+    let equipmentModel: string | null = data.equipment_model ?? null;
+    let equipmentSerialNumber: string | null = data.equipment_serial_number ?? null;
+    let equipmentNickname: string | null = data.equipment_nickname ?? null;
+
+    if (equipmentId && (equipmentId !== currentReport?.equipmentId || !equipmentBrand)) {
+        const { rows: equipRows } = await db.query('SELECT brand, model, "serialNumber", nickname FROM equipments WHERE id = $1', [equipmentId]);
+        if (equipRows.length > 0) {
+            const e = equipRows[0];
+            equipmentBrand = e.brand || null;
+            equipmentModel = e.model || null;
+            equipmentSerialNumber = e.serialNumber || null;
+            equipmentNickname = e.nickname || null;
+        }
+    }
 
     await db.query(
         `UPDATE reports SET 
@@ -303,8 +384,17 @@ export async function updateFullReport(db: PoolClient, reportId: number, data: a
             "description" = $6, "damage" = $7, "serviceType" = $8, "internal_notes" = $9,
             "signature" = $10, "technician_signature" = $11, "includes_travel" = $12,
             "classification" = $13, "time_blocks" = $14, "client_signer_name" = $15,
-            "updated_by" = $16
-        WHERE id = $17`,
+            "client_name" = COALESCE($16, "client_name"),
+            "client_address" = COALESCE($17, "client_address"),
+            "client_nif" = COALESCE($18, "client_nif"),
+            "client_city" = COALESCE($19, "client_city"),
+            "client_postcode" = COALESCE($20, "client_postcode"),
+            "equipment_brand" = COALESCE($21, "equipment_brand"),
+            "equipment_model" = COALESCE($22, "equipment_model"),
+            "equipment_serial_number" = COALESCE($23, "equipment_serial_number"),
+            "equipment_nickname" = COALESCE($24, "equipment_nickname"),
+            "updated_by" = $25
+        WHERE id = $26`,
         [
             clientId, equipmentId, scheduleId, serviceDate, hours,
             description, damage || '', JSON.stringify(Array.isArray(serviceType) ? serviceType : (serviceType ? [serviceType] : [])), internalNotes || '',
@@ -312,13 +402,15 @@ export async function updateFullReport(db: PoolClient, reportId: number, data: a
             classification || 'geral',
             timeBlocks ? JSON.stringify(timeBlocks) : null,
             client_signer_name || null,
+            clientName, clientAddress, clientNif, clientCity, clientPostcode,
+            equipmentBrand, equipmentModel, equipmentSerialNumber, equipmentNickname,
             userId,
             reportId
         ]
     );
 
     await syncReportTechnicians(db, reportId, technicianIds, technicianSignatures);
-    await syncReportPartsAndAbate(db, reportId, parts, true, oldParts, userId);
+    await syncReportPartsAndAbate(db, reportId, parts, false, oldParts, userId);
 
     // Check if billing task is BILLED and any billing-affecting field changed → NEEDS_REVIEW
     {

@@ -27,6 +27,7 @@ import systemRoutes from './modules/system/system.routes';
 import billingRoutes from './modules/billing/billing.routes';
 import taskRoutes from './modules/task/task.routes';
 import invoiceRoutes from './modules/invoice/invoice.routes';
+import analyticsRoutes from './modules/analytics/analytics.routes';
 import { SystemController } from './modules/system/system.controller';
 
 // Services
@@ -49,7 +50,7 @@ const port = process.env.PORT || 5001;
 // CORS restrito ao frontend e origens autorizadas
 const defaultAllowedOrigins = [
   'http://localhost:5173',
-  'http://localhost:3000',
+  'http://192.168.1.83:5173',
   'https://microatomo.vercel.app'
 ];
 
@@ -66,9 +67,9 @@ const corsOptions: cors.CorsOptions = {
     if (!origin) return callback(null, true);
 
     const cleanOrigin = origin.replace(/\/+$/, '');
-    
+
     // Verifica lista de permitidos ou subdomínios Vercel do projeto
-    const isAllowed = allowedOrigins.includes(cleanOrigin) || 
+    const isAllowed = allowedOrigins.includes(cleanOrigin) ||
       /^https:\/\/.*\.vercel\.app$/.test(cleanOrigin);
 
     if (isAllowed) {
@@ -112,6 +113,7 @@ app.use('/api/system', systemRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/invoices', invoiceRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Health check and status alias
 const systemController = new SystemController();

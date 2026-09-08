@@ -31,12 +31,25 @@ export const createReportSchema = z.object({
         technicianSignatures: z.record(z.string(), z.string().nullable()).optional(),
         classification: z.nativeEnum(ServiceClassification).optional(),
         parts: z.array(z.object({
-            id: z.number(),
+            id: z.number().optional(),
             quantity: z.number().positive(),
             stockType: z.nativeEnum(StockType).optional(),
-            isApplied: z.boolean().optional()
+            isApplied: z.boolean().optional(),
+            designation: z.string().optional(),
+            reference: z.string().optional()
         })).optional(),
-        includesTravel: z.boolean().optional()
+        includesTravel: z.boolean().optional(),
+        client_signer_name: z.string().nullable().optional(),
+        timeBlocks: z.array(z.any()).optional(),
+        client_name: z.string().nullable().optional(),
+        client_address: z.string().nullable().optional(),
+        client_nif: z.string().nullable().optional(),
+        client_city: z.string().nullable().optional(),
+        client_postcode: z.string().nullable().optional(),
+        equipment_brand: z.string().nullable().optional(),
+        equipment_model: z.string().nullable().optional(),
+        equipment_serial_number: z.string().nullable().optional(),
+        equipment_nickname: z.string().nullable().optional()
     })
 });
 
@@ -60,11 +73,24 @@ export const updateReportSchema = z.object({
         technicianSignatures: z.record(z.string(), z.string().nullable()).optional(),
         classification: z.nativeEnum(ServiceClassification).optional(),
         parts: z.array(z.object({
-            id: z.number(),
+            id: z.number().optional(),
             quantity: z.number().positive(),
             stockType: z.nativeEnum(StockType).optional(),
-            isApplied: z.boolean().optional()
+            isApplied: z.boolean().optional(),
+            designation: z.string().optional(),
+            reference: z.string().optional()
         })).optional(),
-        includesTravel: z.boolean().optional()
+        includesTravel: z.boolean().optional(),
+        client_signer_name: z.string().nullable().optional(),
+        timeBlocks: z.array(z.any()).optional(),
+        client_name: z.string().nullable().optional(),
+        client_address: z.string().nullable().optional(),
+        client_nif: z.string().nullable().optional(),
+        client_city: z.string().nullable().optional(),
+        client_postcode: z.string().nullable().optional(),
+        equipment_brand: z.string().nullable().optional(),
+        equipment_model: z.string().nullable().optional(),
+        equipment_serial_number: z.string().nullable().optional(),
+        equipment_nickname: z.string().nullable().optional()
     })
 });

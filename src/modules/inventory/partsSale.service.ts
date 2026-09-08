@@ -11,7 +11,9 @@ export class PartsSaleService {
         const labels: Record<string, string> = {
             'SALE': 'Venda',
             'GIVEAWAY': 'Oferta',
-            'DISCARD': 'Descarte'
+            'DISCARD': 'Descarte',
+            'RETURN': 'Devolução',
+            'CONSIGNMENT': 'Consignação'
         };
         return labels[type] || type;
     }
@@ -143,6 +145,17 @@ export class PartsSaleService {
             }
 
             await this.repo.deleteSale(db, id);
+        });
+    }
+
+    async convertToSale(id: number, userId: string) {
+        return withTransactionAs(userId, async (db) => {
+            const sale = await this.repo.getSaleById(db, id);
+            if (!sale) throw new NotFoundError('Venda/Saída não encontrada');
+            if (sale.sale_type !== 'CONSIGNMENT') {
+                throw new BadRequestError('Apenas saídas do tipo Consignação podem ser convertidas em Venda.');
+            }
+            return this.repo.updateSaleType(db, id, 'SALE');
         });
     }
 }

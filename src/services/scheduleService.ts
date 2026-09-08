@@ -471,14 +471,28 @@ export async function createFullSchedule(db: PoolClient, data: any, userId: stri
 
     const generatedTitle = await generateScheduleTitle(supabase, clientId, equipmentId, serviceType);
 
+    // Fetch snapshot data
+    const [clientRes, equipRes] = await Promise.all([
+        db.query<{ name: string; address: string | null; nif: string | null; city: string | null; postCode: string | null }>(
+            'SELECT name, address, nif, city, "postCode" FROM clients WHERE id = $1', [clientId]
+        ),
+        db.query<{ brand: string; model: string; serialNumber: string | null; nickname: string | null }>(
+            'SELECT brand, model, "serialNumber", nickname FROM equipments WHERE id = $1', [equipmentId]
+        )
+    ]);
+    const cl = clientRes.rows[0];
+    const eq = equipRes.rows[0];
+
     const { rows } = await db.query<Schedule>(
         `INSERT INTO schedules (
             title, "startDate", "endDate", "clientId", "equipmentId", 
             "isCompleted", "additionalInfo", "serviceType", "ticketId",
             "acknowledgementState", "includes_travel", "classification", "priority",
-            "created_by", "updated_by", entered_backlog_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) 
-        RETURNING id, title, "startDate", "endDate", "isCompleted", "hasReport", "additionalInfo", "serviceType", "ticketId", "clientId", "equipmentId", "acknowledgementState", "includes_travel", "classification", "priority", "created_by", "updated_by", entered_backlog_at, exited_backlog_at`,
+            "created_by", "updated_by", entered_backlog_at,
+            client_name, client_address, client_nif, client_city, client_postcode,
+            equipment_brand, equipment_model, equipment_serial_number, equipment_nickname
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25) 
+        RETURNING id, title, "startDate", "endDate", "isCompleted", "hasReport", "additionalInfo", "serviceType", "ticketId", "clientId", "equipmentId", "acknowledgementState", "includes_travel", "classification", "priority", "created_by", "updated_by", entered_backlog_at, exited_backlog_at, client_name, client_address, client_nif, client_city, client_postcode, equipment_brand, equipment_model, equipment_serial_number, equipment_nickname`,
         [
             generatedTitle,
             startDate || null,
@@ -495,7 +509,16 @@ export async function createFullSchedule(db: PoolClient, data: any, userId: stri
             priority || null,
             userId,
             userId,
-            (!startDate) ? new Date() : null   // entered_backlog_at
+            (!startDate) ? new Date() : null,   // entered_backlog_at
+            cl?.name || null,
+            cl?.address || null,
+            cl?.nif || null,
+            cl?.city || null,
+            cl?.postCode || null,
+            eq?.brand || null,
+            eq?.model || null,
+            eq?.serialNumber || null,
+            eq?.nickname || null
         ]
     );
     const insertedSchedule = rows[0];
@@ -579,6 +602,17 @@ export async function updateFullSchedule(db: PoolClient, scheduleId: number, dat
     const wasInBacklog = originalSchedule.acknowledgementState === ScheduleStatus.PENDING_SCHEDULING || !originalSchedule.startDate;
     const isExitingBacklog = wasInBacklog && !!startDate;
 
+    const [clientRes2, equipRes2] = await Promise.all([
+        db.query<{ name: string; address: string | null; nif: string | null; city: string | null; postCode: string | null }>(
+            'SELECT name, address, nif, city, "postCode" FROM clients WHERE id = $1', [clientId]
+        ),
+        db.query<{ brand: string; model: string; serialNumber: string | null; nickname: string | null }>(
+            'SELECT brand, model, "serialNumber", nickname FROM equipments WHERE id = $1', [equipmentId]
+        )
+    ]);
+    const cl2 = clientRes2.rows[0];
+    const eq2 = equipRes2.rows[0];
+
     const { rows: updatedRows } = await db.query<Schedule>(
         `UPDATE schedules SET 
             title = $1, "startDate" = $2, "endDate" = $3, "clientId" = $4, "equipmentId" = $5, 
@@ -592,7 +626,9 @@ export async function updateFullSchedule(db: PoolClient, scheduleId: number, dat
             exited_backlog_at = CASE 
                 WHEN $16 AND exited_backlog_at IS NULL THEN NOW() 
                 ELSE exited_backlog_at 
-            END
+            END,
+            client_name = $17, client_address = $18, client_nif = $19, client_city = $20, client_postcode = $21,
+            equipment_brand = $22, equipment_model = $23, equipment_serial_number = $24, equipment_nickname = $25
         WHERE id = $15 RETURNING *`,
         [
             generatedTitle,
@@ -610,7 +646,16 @@ export async function updateFullSchedule(db: PoolClient, scheduleId: number, dat
             data.priority || originalSchedule.priority || null,
             userId,
             scheduleId,
-            isExitingBacklog    // $16
+            isExitingBacklog,    // $16
+            cl2?.name || null,
+            cl2?.address || null,
+            cl2?.nif || null,
+            cl2?.city || null,
+            cl2?.postCode || null,
+            eq2?.brand || null,
+            eq2?.model || null,
+            eq2?.serialNumber || null,
+            eq2?.nickname || null
         ]
     );
     const updatedSchedule = updatedRows[0];

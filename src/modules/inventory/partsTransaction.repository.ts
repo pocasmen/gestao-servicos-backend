@@ -31,13 +31,14 @@ export class PartsTransactionRepository {
 
     async getHistoryByPartId(db: QueryRunner, partId: number): Promise<any[]> {
         const { rows } = await db.query(`
-            SELECT pt.*, p.first_name, p.last_name,
+            SELECT pt.*, p.first_name, p.last_name, ps.sale_type,
                    SUM(pt.quantity) OVER (
                        PARTITION BY pt.part_id, pt.stock_type 
                        ORDER BY pt.created_at ASC, pt.id ASC
                    ) as running_stock
             FROM parts_transactions pt
             LEFT JOIN profiles p ON pt.user_id = p.id
+            LEFT JOIN parts_sales ps ON (pt.type = 'DIRECT_SALE' AND pt.reference_id ~ '^[0-9]+$' AND ps.id = pt.reference_id::integer)
             WHERE pt.part_id = $1
             ORDER BY pt.created_at DESC, pt.id DESC
         `, [partId]);
@@ -51,13 +52,14 @@ export class PartsTransactionRepository {
         const total = parseInt(countRes.rows[0].count, 10);
 
         const { rows } = await db.query(`
-            SELECT pt.*, p.first_name, p.last_name, part.designation, part.reference,
+            SELECT pt.*, p.first_name, p.last_name, part.designation, part.reference, ps.sale_type,
                    SUM(pt.quantity) OVER (
                        PARTITION BY pt.part_id, pt.stock_type 
                        ORDER BY pt.created_at ASC, pt.id ASC
                    ) as running_stock
             FROM parts_transactions pt
             LEFT JOIN profiles p ON pt.user_id = p.id
+            LEFT JOIN parts_sales ps ON (pt.type = 'DIRECT_SALE' AND pt.reference_id ~ '^[0-9]+$' AND ps.id = pt.reference_id::integer)
             JOIN parts part ON pt.part_id = part.id
             ORDER BY pt.created_at DESC, pt.id DESC
             LIMIT $1 OFFSET $2

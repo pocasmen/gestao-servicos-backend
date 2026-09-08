@@ -9,4 +9,6 @@ export interface CreateClientDto {
     blacklist_reason?: string;
 }
 
-export interface UpdateClientDto extends Partial<CreateClientDto> {}
+export interface UpdateClientDto extends Partial<CreateClientDto> {
+    propagateToReports?: boolean;
+}

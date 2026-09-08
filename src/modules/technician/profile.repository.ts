@@ -2,11 +2,15 @@ import { pool } from '../../config/db';
 import { QueryRunner } from '../../types';
 
 export class ProfileRepository {
-    async findTechnicians(db: QueryRunner): Promise<any[]> {
+    async findTechnicians(db: QueryRunner, includeInactive: boolean = false): Promise<any[]> {
+        const roles = includeInactive
+            ? `('technician', 'admin', 'office_staff', 'super_admin', 'inactive_technician')`
+            : `('technician', 'admin', 'office_staff', 'super_admin')`;
+
         const { rows } = await db.query(`
             SELECT *, CONCAT(first_name, ' ', last_name) as name
             FROM profiles
-            WHERE role IN ('technician', 'admin', 'office_staff', 'super_admin')
+            WHERE role IN ${roles}
             ORDER BY first_name ASC
         `);
         return rows;

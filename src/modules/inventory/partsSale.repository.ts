@@ -71,6 +71,16 @@ export class PartsSaleRepository {
         return { ...rows[0], items };
     }
 
+    async updateSaleType(db: QueryRunner, id: number, saleType: string): Promise<any> {
+        const { rows } = await db.query(`
+            UPDATE parts_sales 
+            SET sale_type = $1, updated_at = NOW() 
+            WHERE id = $2 
+            RETURNING *
+        `, [saleType, id]);
+        return rows[0];
+    }
+
     async deleteSale(db: QueryRunner, id: number): Promise<void> {
         await db.query(`DELETE FROM parts_sales WHERE id = $1`, [id]);
     }

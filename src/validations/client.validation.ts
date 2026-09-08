@@ -32,9 +32,13 @@ export const updateClientSchema = z.object({
     }),
     body: z.object({
         name: z.string().min(2).max(200).trim().optional(),
+        nickname: z.string().max(100).optional().or(z.literal('')),
         address: z.string().max(500).optional().or(z.literal('')),
         city: z.string().max(100).optional().or(z.literal('')),
         postCode: z.string().regex(/^\d{4}-\d{3}$/, 'Formato: 1234-567').optional().or(z.literal('')),
         nif: z.string().regex(/^\d{9}$/, 'Deve ter 9 dígitos').optional().or(z.literal('')),
+        is_blacklisted: z.boolean().optional(),
+        blacklist_reason: z.string().optional().or(z.literal('')),
+        propagateToReports: z.boolean().optional()
     })
 });

@@ -55,8 +55,8 @@ export class ScheduleRepository {
 
         const { rows } = await this.pool.query(`
             SELECT s.*,
-                c.name as "clientName",
-                CONCAT(e.brand, ' ', e.model) as "equipmentModel",
+                COALESCE(s.client_name, c.name) as "clientName",
+                COALESCE(CONCAT(s.equipment_brand, ' ', s.equipment_model), CONCAT(e.brand, ' ', e.model)) as "equipmentModel",
                 NULLIF(TRIM(CONCAT(p_creator.first_name, ' ', p_creator.last_name)), '') as "creator_name",
                 NULLIF(TRIM(CONCAT(p_updater.first_name, ' ', p_updater.last_name)), '') as "updater_name",
                 COALESCE(
@@ -90,8 +90,8 @@ export class ScheduleRepository {
     async findById(id: number) {
         const { rows } = await this.pool.query(`
             SELECT s.*,
-                c.name as "clientName",
-                CONCAT(e.brand, ' ', e.model) as "equipmentModel",
+                COALESCE(s.client_name, c.name) as "clientName",
+                COALESCE(CONCAT(s.equipment_brand, ' ', s.equipment_model), CONCAT(e.brand, ' ', e.model)) as "equipmentModel",
                 NULLIF(TRIM(CONCAT(p_creator.first_name, ' ', p_creator.last_name)), '') as "creator_name",
                 NULLIF(TRIM(CONCAT(p_updater.first_name, ' ', p_updater.last_name)), '') as "updater_name",
                 COALESCE(
@@ -201,8 +201,8 @@ export class ScheduleRepository {
     async findWeeklySchedules(startDate: string, endDate: string) {
         const { rows } = await this.pool.query(`
             SELECT s.*,
-                c.name as "clientName",
-                e.model as "equipmentModel",
+                COALESCE(s.client_name, c.name) as "clientName",
+                COALESCE(s.equipment_model, e.model) as "equipmentModel",
                 NULLIF(TRIM(CONCAT(p_creator.first_name, ' ', p_creator.last_name)), '') as "creator_name",
                 NULLIF(TRIM(CONCAT(p_updater.first_name, ' ', p_updater.last_name)), '') as "updater_name",
                 COALESCE(
@@ -234,8 +234,8 @@ export class ScheduleRepository {
     async findPendingReports(startDate: string, endDate: string) {
         const { rows } = await this.pool.query(`
             SELECT s.*,
-                c.name as "clientName",
-                e.model as "equipmentModel",
+                COALESCE(s.client_name, c.name) as "clientName",
+                COALESCE(s.equipment_model, e.model) as "equipmentModel",
                 NULLIF(TRIM(CONCAT(p_creator.first_name, ' ', p_creator.last_name)), '') as "creator_name",
                 NULLIF(TRIM(CONCAT(p_updater.first_name, ' ', p_updater.last_name)), '') as "updater_name",
                 COALESCE(
@@ -330,11 +330,17 @@ export class ScheduleRepository {
                 COUNT(*) FILTER (WHERE "isCompleted" = false AND ("acknowledgementState" = 'pending_scheduling' OR "startDate" IS NULL))::integer AS total,
                 COUNT(*) FILTER (WHERE "isCompleted" = false AND ("acknowledgementState" = 'pending_scheduling' OR "startDate" IS NULL) AND entered_backlog_at >= NOW() - INTERVAL '7 days')::integer AS created_last_7_days,
                 COUNT(*) FILTER (WHERE "isCompleted" = false AND ("acknowledgementState" = 'pending_scheduling' OR "startDate" IS NULL) AND entered_backlog_at >= NOW() - INTERVAL '14 days' AND entered_backlog_at < NOW() - INTERVAL '7 days')::integer AS created_previous_7_days,
+                COUNT(*) FILTER (WHERE "isCompleted" = false AND ("acknowledgementState" = 'pending_scheduling' OR "startDate" IS NULL) AND entered_backlog_at >= NOW() - INTERVAL '30 days')::integer AS created_last_30_days,
+                COUNT(*) FILTER (WHERE "isCompleted" = false AND ("acknowledgementState" = 'pending_scheduling' OR "startDate" IS NULL) AND entered_backlog_at >= NOW() - INTERVAL '60 days' AND entered_backlog_at < NOW() - INTERVAL '30 days')::integer AS created_previous_30_days,
                 MIN(entered_backlog_at) FILTER (WHERE "isCompleted" = false AND ("acknowledgementState" = 'pending_scheduling' OR "startDate" IS NULL)) AS oldest_created_at,
                 -- Saídas reais do backlog (exited_backlog_at é preenchido apenas quando sai do backlog)
                 COUNT(*) FILTER (WHERE exited_backlog_at >= NOW() - INTERVAL '7 days')::integer AS exited_last_7_days,
                 COUNT(*) FILTER (WHERE exited_backlog_at >= NOW() - INTERVAL '14 days' AND exited_backlog_at < NOW() - INTERVAL '7 days')::integer AS exited_previous_7_days,
-                -- Tempo médio em backlog (em horas), apenas registos que já saíram
+                COUNT(*) FILTER (WHERE exited_backlog_at >= NOW() - INTERVAL '30 days')::integer AS exited_last_30_days,
+                COUNT(*) FILTER (WHERE exited_backlog_at >= NOW() - INTERVAL '60 days' AND exited_backlog_at < NOW() - INTERVAL '30 days')::integer AS exited_previous_30_days,
+                -- Tempo médio em backlog (em horas), para saídas dos últimos 7 dias, 30 dias e global
+                AVG(EXTRACT(EPOCH FROM (exited_backlog_at - entered_backlog_at)) / 3600.0) FILTER (WHERE exited_backlog_at >= NOW() - INTERVAL '7 days' AND entered_backlog_at IS NOT NULL)::numeric(10,1) AS avg_hours_in_backlog_7d,
+                AVG(EXTRACT(EPOCH FROM (exited_backlog_at - entered_backlog_at)) / 3600.0) FILTER (WHERE exited_backlog_at >= NOW() - INTERVAL '30 days' AND entered_backlog_at IS NOT NULL)::numeric(10,1) AS avg_hours_in_backlog_30d,
                 AVG(EXTRACT(EPOCH FROM (exited_backlog_at - entered_backlog_at)) / 3600.0) FILTER (WHERE exited_backlog_at IS NOT NULL AND entered_backlog_at IS NOT NULL)::numeric(10,1) AS avg_hours_in_backlog
             FROM schedules
         `);
@@ -345,9 +351,15 @@ export class ScheduleRepository {
             total: parseInt(b.total, 10) || 0,
             createdLast7Days: parseInt(b.created_last_7_days, 10) || 0,
             createdPrevious7Days: parseInt(b.created_previous_7_days, 10) || 0,
+            createdLast30Days: parseInt(b.created_last_30_days, 10) || 0,
+            createdPrevious30Days: parseInt(b.created_previous_30_days, 10) || 0,
             oldestCreatedAt: b.oldest_created_at || null,
             exitedLast7Days: parseInt(b.exited_last_7_days, 10) || 0,
             exitedPrevious7Days: parseInt(b.exited_previous_7_days, 10) || 0,
+            exitedLast30Days: parseInt(b.exited_last_30_days, 10) || 0,
+            exitedPrevious30Days: parseInt(b.exited_previous_30_days, 10) || 0,
+            avgHoursInBacklog7Days: b.avg_hours_in_backlog_7d ? parseFloat(b.avg_hours_in_backlog_7d) : null,
+            avgHoursInBacklog30Days: b.avg_hours_in_backlog_30d ? parseFloat(b.avg_hours_in_backlog_30d) : null,
             avgHoursInBacklog: b.avg_hours_in_backlog ? parseFloat(b.avg_hours_in_backlog) : null,
         };
     }

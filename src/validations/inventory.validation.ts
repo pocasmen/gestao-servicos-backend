@@ -55,7 +55,8 @@ export const updateStockSchema = z.object({
     body: z.object({
         quantity: z.number(),
         fromOrder: z.boolean().optional(),
-        targetStock: z.nativeEnum(StockType).optional()
+        targetStock: z.nativeEnum(StockType).optional(),
+        notes: z.string().optional()
     })
 });
 

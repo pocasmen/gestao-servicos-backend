@@ -20,7 +20,11 @@ export const updateEquipmentSchema = z.object({
         model: z.string().min(1).optional(),
         serialNumber: z.string().min(1).optional(),
         clientId: z.number().int().positive().optional(),
+        nickname: z.string().optional().nullable(),
         additionalInfo: z.string().optional().nullable(),
+        category: z.string().optional().nullable(),
+        status: z.string().optional().nullable(),
+        propagateToReports: z.boolean().optional()
     })
 });
 

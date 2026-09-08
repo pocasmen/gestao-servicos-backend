@@ -8,8 +8,8 @@ import { logger } from '../../utils/logger';
 export class TechnicianService {
     constructor(private profileRepo: ProfileRepository) {}
 
-    async getTechnicians() {
-        return this.profileRepo.findTechnicians(pool);
+    async getTechnicians(includeInactive: boolean = false) {
+        return this.profileRepo.findTechnicians(pool, includeInactive);
     }
 
     async getExternalUsers(filters: { search?: string, category?: string } = {}) {

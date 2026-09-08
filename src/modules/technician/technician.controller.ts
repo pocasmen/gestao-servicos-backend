@@ -8,7 +8,8 @@ export class TechnicianController {
     constructor(private technicianService: TechnicianService) {}
 
     getTechnicians = catchAsync(async (req: AuthenticatedRequest, res: Response) => {
-        const technicians = await this.technicianService.getTechnicians();
+        const includeInactive = req.query.includeInactive === 'true';
+        const technicians = await this.technicianService.getTechnicians(includeInactive);
         res.json(technicians);
     });
 

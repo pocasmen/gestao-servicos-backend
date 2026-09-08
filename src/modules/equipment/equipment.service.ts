@@ -33,13 +33,53 @@ export class EquipmentService {
 
     async updateEquipment(id: number, data: UpdateEquipmentDto, userId: string) {
         return withTransactionAs(userId, async (db) => {
-            if (data.serialNumber) {
-                const existing = await this.repo.findBySerialNumber(data.serialNumber, id, db);
+            const { propagateToReports, ...equipmentData } = data;
+            if (equipmentData.serialNumber) {
+                const existing = await this.repo.findBySerialNumber(equipmentData.serialNumber, id, db);
                 if (existing) throw new BadRequestError('Já existe um equipamento com este número de série.');
             }
-            const updated = await this.repo.update(id, data, db);
+            const updated = await this.repo.update(id, equipmentData, db);
             if (!updated) throw new NotFoundError('Equipamento não encontrado.');
-            return this.repo.findById(updated.id, db);
+
+            let updatedReportsCount = 0;
+            let updatedSchedulesCount = 0;
+            if (propagateToReports) {
+                const params = [
+                    updated.brand || null,
+                    updated.model || null,
+                    updated.serialNumber || null,
+                    updated.nickname || null,
+                    userId,
+                    id
+                ];
+
+                const repRes = await db.query(
+                    `UPDATE reports SET
+                        equipment_brand = COALESCE($1, equipment_brand),
+                        equipment_model = COALESCE($2, equipment_model),
+                        equipment_serial_number = COALESCE($3, equipment_serial_number),
+                        equipment_nickname = COALESCE($4, equipment_nickname),
+                        updated_by = $5
+                    WHERE "equipmentId" = $6 AND deleted_at IS NULL`,
+                    params
+                );
+                updatedReportsCount = repRes.rowCount || 0;
+
+                const schRes = await db.query(
+                    `UPDATE schedules SET
+                        equipment_brand = COALESCE($1, equipment_brand),
+                        equipment_model = COALESCE($2, equipment_model),
+                        equipment_serial_number = COALESCE($3, equipment_serial_number),
+                        equipment_nickname = COALESCE($4, equipment_nickname),
+                        updated_by = $5
+                    WHERE "equipmentId" = $6`,
+                    params
+                );
+                updatedSchedulesCount = schRes.rowCount || 0;
+            }
+
+            const fresh = await this.repo.findById(updated.id, db);
+            return { ...fresh, updatedReportsCount, updatedSchedulesCount };
         });
     }
 

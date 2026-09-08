@@ -22,9 +22,51 @@ export class ClientService {
 
     async updateClient(id: number, data: UpdateClientDto, userId: string) {
         return withTransactionAs(userId, async (db) => {
-            const updated = await this.repo.update(id, data, db);
+            const { propagateToReports, ...clientData } = data;
+            const updated = await this.repo.update(id, clientData, db);
             if (!updated) throw new NotFoundError('Cliente não encontrado.');
-            return updated;
+
+            let updatedReportsCount = 0;
+            let updatedSchedulesCount = 0;
+            if (propagateToReports) {
+                const params = [
+                    updated.name || null,
+                    updated.address || null,
+                    updated.nif || null,
+                    updated.city || null,
+                    updated.postCode || null,
+                    userId,
+                    id
+                ];
+
+                const repRes = await db.query(
+                    `UPDATE reports SET
+                        client_name = COALESCE($1, client_name),
+                        client_address = COALESCE($2, client_address),
+                        client_nif = COALESCE($3, client_nif),
+                        client_city = COALESCE($4, client_city),
+                        client_postcode = COALESCE($5, client_postcode),
+                        updated_by = $6
+                    WHERE "clientId" = $7 AND deleted_at IS NULL`,
+                    params
+                );
+                updatedReportsCount = repRes.rowCount || 0;
+
+                const schRes = await db.query(
+                    `UPDATE schedules SET
+                        client_name = COALESCE($1, client_name),
+                        client_address = COALESCE($2, client_address),
+                        client_nif = COALESCE($3, client_nif),
+                        client_city = COALESCE($4, client_city),
+                        client_postcode = COALESCE($5, client_postcode),
+                        updated_by = $6
+                    WHERE "clientId" = $7`,
+                    params
+                );
+                updatedSchedulesCount = schRes.rowCount || 0;
+            }
+
+            return { ...updated, updatedReportsCount, updatedSchedulesCount };
         });
     }
 

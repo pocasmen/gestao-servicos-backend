@@ -9,4 +9,6 @@ export interface CreateEquipmentDto {
     category?: string;
 }
 
-export interface UpdateEquipmentDto extends Partial<CreateEquipmentDto> {}
+export interface UpdateEquipmentDto extends Partial<CreateEquipmentDto> {
+    propagateToReports?: boolean;
+}
